@@ -1,0 +1,118 @@
+version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 2181:2181
+  kafka1:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka1
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+  kafka2:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka2
+    depends_on:
+      - zookeeper
+    ports:
+      - 9093:9093
+      - 29093:29093
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9093,PLAINTEXT_HOST://localhost:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+  kafka-ui:
+    image: provectuslabs/kafka-ui:master
+    container_name: kafka-ui
+    ports:
+      - 8090:8080
+    depends_on:
+      - zookeeper
+      - kafka1
+      - kafka2
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka1:9092,kafka2:9093
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+  mongo1:
+    container_name: mongo1
+    image: mongo
+    expose:
+      - 20001
+    ports:
+      - 20001:27017
+    restart: always
+    command: mongod --replSet ecom-rs-set
+    volumes:
+      - /Users/vanilla/Projects/practise/java-reactive/kafka-reactive/dockerdata/mongo1:/data/db
+  mongo2:
+    container_name: mongo2
+    image: mongo
+    expose:
+      - 20002
+    ports:
+      - 20002:27017
+    restart: always
+    command: mongod --replSet ecom-rs-set
+    volumes:
+      - /Users/vanilla/Projects/practise/java-reactive/kafka-reactive/dockerdata/mongo2:/data/db
+  mongo3:
+    container_name: mongo3
+    image: mongo
+    expose:
+      - 20003
+    ports:
+      - 20003:27017
+    volumes:
+      - /Users/vanilla/Projects/practise/java-reactive/kafka-reactive/dockerdata/mongo3:/data/db
+    restart: always
+    command: mongod --replSet ecom-rs-set
+  mongoinit:
+    image: mongo
+    # this container will exit after executing the command
+    restart: "no"
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+    command: >
+      mongo --host mongo1:20001 --eval 
+      '
+      db = (new Mongo("localhost:20001")).getDB("reactive-systems");
+      config = {
+      "_id" : "ecom-rs-set",
+      "members" : [
+        {
+          "_id" : 0,
+          "host" : "mongo1:20001"
+        },
+        {
+          "_id" : 1,
+          "host" : "mongo2:20002"
+        },
+        {
+          "_id" : 2,
+          "host" : "mongo3:20003"
+        }
+      ]
+      };
+      rs.initiate(config);
+      '

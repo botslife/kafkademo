@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  order-service:
+    container_name: order-app
+    build:
+      context: ./order-service
+      dockerfile: DockerfileDev
+    ports:
+      - "30000:30000"
+  inventory-service:
+    container_name: inventory-app
+    build:
+        context: ./inventory-service
+        dockerfile: DockerfileDev
+    ports:
+      - "30001:30001"
+  shipping-service:
+    container_name: shipping-app
+    build:
+        context: ./shipping-service
+        dockerfile: DockerfileDev
+    ports:
+      - "30002:30002"
